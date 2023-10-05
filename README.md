@@ -1,4 +1,4 @@
-# CI Pipeline for Grails based application using Gitolite, Jenkins, Gradle and SonarQube
+# CI/CD Pipeline for Grails based application using Gitolite, Jenkins, Gradle and SonarQube
 
 This project enumerates the steps required to create a Continuous Integration Pipeline. The Pipeline is created based on the GitOps philosophy wherein Git acts as a single source of truth and the initiation of the pipeline is triggered through  Git events.
 
