@@ -1,0 +1,58 @@
+node{
+    # This stage utilises the credentials of Git as stored in Jenkins, autheticates to the specified branch and clones the branch
+    stage('Clone Repo'){
+        git branch: 'development', credentialsId: 'git', url: 'gitserver@172.17.1.2:NAMS'
+    }
+    # This stage utilised the credentials of Sonarqube as stored in Jenkins and authenticates Jenkins with SOnarqube
+    # cd to the project folder.
+    # Sonarqube by defualt searches for the folder "main in the root project dir.
+    # In our case it is at path src/main. So copying the "main" folder to root project directory
+    # Utilising modified gradle-wrapper.properties to hint gradlew to use local dependencies folder rather than internet
+    # Granting permission to the project root folder
+    # Invoke sonarqube testing, use th project token recived after creatinga  project in Sonarqube server.
+    stage('Static Code Analysis') {
+      environment {
+        SONAR_URL = "http://127.0.0.1:9000"
+      }
+        withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
+    
+        sh script:'''
+        #!/bin/bash
+
+        # Go to the pipeline folder under /var/lib
+        # Copy the gradle-wrapper.properties file to the gradle/wrapper folder in your pipeline
+        # Assign necessary permissions to the pipeline
+        ./gradlew sonar -Dsonar.projectKey=<project key> -Dsonar.host.url=<url where sonarqube is hosted> -Dsonar.login=<unique key>
+        '''
+        }
+    }
+
+    # This stage invokes web archive file generation
+    # cd to the project root folder.
+    # Utilising modified gradle-wrapper.properties to hint gradlew to use local dependencies folder rather than internet followed by invoke war
+    stage('WAR build'){
+        sh script:'''
+        #!/bin/bash
+        # cd to the pipeline folder
+        # assign necessary permissions
+        # Build war (web archive)
+        ./gradlew war
+        
+        '''
+    }
+    
+    # This stage autheticates Jenkins with NAS
+    # Using the sshagent, ssh into the NAS
+    # Make a directory with name as the sysdate
+    # Copy the generated .war file from the location (as done in war build stage) to folder in NAS.
+    # This serves as a war version control  and will help in rollback to a previous known healthy configuration
+    stage('WAR Transfer to NAS'){
+        sshagent(['nas']) {
+        sh script:'''
+        #!/bin/bash
+        ssh -o StrictHostKeyChecking=no admin@<location to NAS> mkdir <folder to save war>####WAR####/2023/MAY_23/"$(date +"%d-%m-%Y")"
+        scp -o StrictHostKeyChecking=no <location to war file> admin@<location to NAS>:<folder to save war>####WAR####/2023/MAY_23/"$(date +"%d-%m-%Y")"/
+        '''
+        }
+    }
+}
